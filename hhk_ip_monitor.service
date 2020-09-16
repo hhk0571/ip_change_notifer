@@ -1,0 +1,11 @@
+[Unit]
+Description=Monitor IP address and notify me if it changed
+
+[Service]
+Type=simple
+WorkingDirectory=/home/hhk/projects/ip_monitor
+ExecStart=/usr/bin/python3 ip_monitor.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
