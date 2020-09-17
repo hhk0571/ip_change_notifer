@@ -6,8 +6,6 @@
     - [设置邮箱信息](#设置邮箱信息)
     - [运行服务程序](#运行服务程序)
     - [配置开机自动执行该程序](#配置开机自动执行该程序)
-        - [编辑service文件](#编辑service文件)
-        - [安装service](#安装service)
 
 <!-- /TOC -->
 
@@ -65,7 +63,7 @@ class Config(object):
 ## 运行服务程序
 在家里的计算机（最好是Linux，比如Ubuntu，在Windows上也可以）上运行服务程序, 执行的命令如下:
 ```bash
-python3 ip_monitor.py
+python3 ip_change_notifer.py
 ```
 
 如需取消, 请按 `CTRL+C`
@@ -74,22 +72,22 @@ python3 ip_monitor.py
 
 ### 编辑service文件
 
-hhk_ip_monitor.service:
+hhk_ip_change_notifer.service:
 ```bash
 # 根据自己的程序存放路径设置service文件里到工作目录
-WorkingDirectory=/home/hhk/projects/ip_monitor
+WorkingDirectory=/home/hhk/projects/ip_change_notifer
 ```
 ### 安装service
 
 ```bash
-sudo cp hhk_ip_monitor.service /lib/systemd/system/
+sudo cp hhk_ip_change_notifer.service /lib/systemd/system/
 
 # 启动service
-sudo systemctl start hhk_ip_monitor.service
+sudo systemctl start hhk_ip_change_notifer.service
 
 # 激活service (使service在开机时自动启动)
-sudo systemctl enable hhk_ip_monitor.service
+sudo systemctl enable hhk_ip_change_notifer.service
 
 # 查看service状态
-sudo systemctl status hhk_ip_monitor.service
+sudo systemctl status hhk_ip_change_notifer.service
 ```

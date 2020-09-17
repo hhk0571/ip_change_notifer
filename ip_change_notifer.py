@@ -138,7 +138,7 @@ class PopServer(SmtpPop3Base):
         return msg
 
 
-class IpMonitor(object):
+class IpChangeNotifer(object):
     IP_FILENAME = '__ip.txt'
 
     def __init__(self):
@@ -193,5 +193,5 @@ class IpMonitor(object):
                 syslog.syslog(str(e))
 
 if __name__ == "__main__":
-    ip_monitor = IpMonitor()
-    ip_monitor.run()
+    ip_chg_notifer = IpChangeNotifer()
+    ip_chg_notifer.run()
