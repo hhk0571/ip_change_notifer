@@ -143,7 +143,7 @@ class IpChangeNotifer(object):
 
     def __init__(self):
         self.smtp_server = SmtpServer()
-        self.ip = self.load_ip()
+        self.old_ip = self.load_ip()
 
     def load_ip(self):
         try:
@@ -154,7 +154,7 @@ class IpChangeNotifer(object):
 
     def store_ip(self, ip):
         if not ip: return
-        self.ip = ip
+        self.old_ip = ip
         with open(self.IP_FILENAME, 'w') as f:
             f.write(ip)
 
@@ -180,17 +180,21 @@ class IpChangeNotifer(object):
     def run(self):
         while True:
             try:
-                ip = self.query_ip()
-                syslog.syslog('Queried IP: %s' % ip)
-                if ip and ip != self.ip:
-                    self.send_email(Config.RECIEVER, 'Ubuntu IP address: %s' % ip, ip)
-                    self.store_ip(ip)
+                new_ip = self.query_ip()
+                syslog.syslog('Queried IP: %s' % new_ip)
+                if new_ip and new_ip != self.old_ip:
+                    old_ip = self.old_ip
+                    self.send_email(Config.RECIEVER, 'Ubuntu IP address: %s' % new_ip, new_ip)
+                    self.store_ip(new_ip)
+                    syslog.syslog('Notify IP changed. old: %s new: %s' % (old_ip, new_ip))
+            except Exception as e:
+                syslog.syslog(str(e))
+
+            try:
                 time.sleep(Config.CHECK_INTERVAL * 60)
             except KeyboardInterrupt:
                 print('\nInterrupted by user.\nBye bye~~')
                 break
-            except Exception as e:
-                syslog.syslog(str(e))
 
 if __name__ == "__main__":
     ip_chg_notifer = IpChangeNotifer()
