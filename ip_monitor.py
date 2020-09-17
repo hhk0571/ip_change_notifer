@@ -2,8 +2,9 @@
 import os
 import sys
 import time
-import requests
 import smtplib
+import poplib
+import requests
 from email import encoders
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart, MIMEBase
@@ -12,6 +13,7 @@ from email.header import decode_header
 from email.utils import parseaddr
 import json
 from config import Config
+import syslog
 
 if Config.ENABLE_PROXY:
     import socks
@@ -19,6 +21,8 @@ if Config.ENABLE_PROXY:
     socks.set_default_proxy(socks.PROXY_TYPES[Config.PROXY_TYPE], Config.PROXY_IP, Config.PROXY_PORT)
     socket.socket = socks.socksocket
 
+
+syslog.openlog(logoption=syslog.LOG_PID)
 
 WIDTH = 50
 SCREENSHOT_FILE = 'screenshot.jpg'
@@ -60,7 +64,7 @@ class SmtpServer(SmtpPop3Base):
         else:
             try:
                 self.server = smtplib.SMTP_SSL(Config.SMTP_SERVER, Config.SMTP_PORT)
-            except:
+            except Exception:
                 self.server = smtplib.SMTP_SSL(Config.SMTP_SERVER)
             self.server.set_debuglevel(Config.DEBUG_LEVEL)
             self.server.ehlo(Config.SMTP_SERVER)
@@ -140,7 +144,7 @@ class IpMonitor(object):
     def __init__(self):
         self.smtp_server = SmtpServer()
         self.ip = self.load_ip()
-    
+
     def load_ip(self):
         try:
             with open(self.IP_FILENAME, 'r') as f:
@@ -149,43 +153,44 @@ class IpMonitor(object):
             return ''
 
     def store_ip(self, ip):
+        if not ip: return
         self.ip = ip
         with open(self.IP_FILENAME, 'w') as f:
             f.write(ip)
 
-
     def query_ip(self):
+        '''
+        通过调用REST API查询当前网络的公网IP
+        查询返回的是一段字符串, 如下:
+        var returnCitySN = {"cip": "115.192.37.116", "cid": "330100", "cname": "浙江省杭州市"};
+        函数返回 IP 字符串, 或 None
+        '''
         r = requests.get('http://pv.sohu.com/cityjson?ie=utf-8')
-        # return text is below:
-        # 'var returnCitySN = {"cip": "115.192.37.116", "cid": "330100", "cname": "浙江省杭州市"};'
+        syslog.syslog('API result: ' + r.text)
         if r.ok:
             s = r.text[r.text.find('{'):-1]
             obj = json.loads(s)
             return obj.get('cip')
 
-
     def send_email(self, to_addr, subject='', content=None, filename=None):
-        try:
-            self.smtp_server.login()
-            self.smtp_server.send_msg(to_addr, subject, content, filename)
-            self.smtp_server.quit()
-            return True
-        except:
-            return False
-
+        self.smtp_server.login()
+        self.smtp_server.send_msg(to_addr, subject, content, filename)
+        self.smtp_server.quit()
 
     def run(self):
         while True:
             try:
                 ip = self.query_ip()
-                if ip and ip != self.ip and self.send_email(Config.RECIEVER, 'Ubuntu IP address: %s' % ip, ip):
+                syslog.syslog('Queried IP: %s' % ip)
+                if ip and ip != self.ip:
+                    self.send_email(Config.RECIEVER, 'Ubuntu IP address: %s' % ip, ip)
                     self.store_ip(ip)
-                time.sleep(Config.CHECK_INTERVAL*60)
+                time.sleep(Config.CHECK_INTERVAL * 60)
             except KeyboardInterrupt:
                 print('\nInterrupted by user.\nBye bye~~')
                 break
-            except:
-                pass
+            except Exception as e:
+                syslog.syslog(str(e))
 
 if __name__ == "__main__":
     ip_monitor = IpMonitor()
