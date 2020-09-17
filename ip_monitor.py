@@ -184,6 +184,8 @@ class IpMonitor(object):
             except KeyboardInterrupt:
                 print('\nInterrupted by user.\nBye bye~~')
                 break
+            except:
+                pass
 
 if __name__ == "__main__":
     ip_monitor = IpMonitor()
