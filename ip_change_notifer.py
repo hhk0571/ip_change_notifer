@@ -160,17 +160,13 @@ class IpChangeNotifer(object):
 
     def query_ip(self):
         '''
-        通过调用REST API查询当前网络的公网IP
-        查询返回的是一段字符串, 如下:
-        var returnCitySN = {"cip": "115.192.37.116", "cid": "330100", "cname": "浙江省杭州市"};
+        通过调用REST API 'https://api.ipify.org'查询当前网络的公网IP
         函数返回 IP 字符串, 或 None
         '''
-        r = requests.get('http://pv.sohu.com/cityjson?ie=utf-8')
+        r = requests.get('https://api.ipify.org')
         syslog.syslog('API result: ' + r.text)
         if r.ok:
-            s = r.text[r.text.find('{'):-1]
-            obj = json.loads(s)
-            return obj.get('cip')
+            return r.text
 
     def send_email(self, to_addr, subject='', content=None, filename=None):
         self.smtp_server.login()
