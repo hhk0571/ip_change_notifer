@@ -116,10 +116,16 @@ class IpQueryer(object):
         通过调用REST API 'https://api.ipify.org'查询当前网络的公网IP
         函数返回 IP 字符串, 或 None
         '''
-        r = requests.get('https://api.ipify.org')
-        logging.debug('API result: ' + r.text)
-        if r.ok:
-            return r.text
+        ip = None
+        try:
+            r = requests.get('https://api.ipify.org')
+            logging.debug('API result: ' + r.text)
+            if r.ok:
+                ip = r.text
+        finally:
+            r.close()
+        return ip
+
 
 class IpChangeNotifer(object):
     IP_FILENAME = '__ip.txt'
