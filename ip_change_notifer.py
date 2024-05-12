@@ -1,9 +1,8 @@
+#! /usr/bin/env python3
 # coding: utf-8
 import os
-import sys
 import time
 import smtplib
-import poplib
 import requests
 from email import encoders
 from email.mime.text import MIMEText
@@ -11,9 +10,8 @@ from email.mime.multipart import MIMEMultipart, MIMEBase
 from email.parser import Parser
 from email.header import decode_header
 from email.utils import parseaddr
-import json
+import logging
 from config import Config
-import syslog
 
 if Config.ENABLE_PROXY:
     import socks
@@ -22,7 +20,9 @@ if Config.ENABLE_PROXY:
     socket.socket = socks.socksocket
 
 
-syslog.openlog(logoption=syslog.LOG_PID)
+logging.basicConfig(
+    filename='app.log', level=logging.INFO,
+    format='%(asctime)s %(levelname)s:%(filename)s:%(lineno)d: %(message)s')
 
 WIDTH = 50
 SCREENSHOT_FILE = 'screenshot.jpg'
@@ -110,39 +110,23 @@ class SmtpServer(SmtpPop3Base):
             return False
 
 
-class PopServer(SmtpPop3Base):
-    def __init__(self):
-        super().__init__()
-        self.parser = Parser()
-        self.login()
-
-    def _login_impl(self):
-        self.server = poplib.POP3(Config.POP_SERVER)
-        self.server.set_debuglevel(Config.DEBUG_LEVEL)
-        self.server.user(Config.USERNAME)
-        self.server.pass_(Config.PASSWORD)
-
-    def _quit_impl(self):
-        self.server.quit()
-
-    @property
-    def msg_num(self):
-        self.assert_server_is_login()
-        return self.server.stat()[0]
-
-    def get_msg(self, index):
-        self.assert_server_is_login()
-        __, lines, __ = self.server.retr(index)
-        msg = b'\n'.join(lines).decode()
-        msg = self.parser.parsestr(msg)
-        return msg
-
+class IpQueryer(object):
+    def query_ip(self):
+        '''
+        通过调用REST API 'https://api.ipify.org'查询当前网络的公网IP
+        函数返回 IP 字符串, 或 None
+        '''
+        r = requests.get('https://api.ipify.org')
+        logging.debug('API result: ' + r.text)
+        if r.ok:
+            return r.text
 
 class IpChangeNotifer(object):
     IP_FILENAME = '__ip.txt'
 
     def __init__(self):
         self.smtp_server = SmtpServer()
+        self.ip_queryer = IpQueryer()
         self.old_ip = self.load_ip()
 
     def load_ip(self):
@@ -158,16 +142,6 @@ class IpChangeNotifer(object):
         with open(self.IP_FILENAME, 'w') as f:
             f.write(ip)
 
-    def query_ip(self):
-        '''
-        通过调用REST API 'https://api.ipify.org'查询当前网络的公网IP
-        函数返回 IP 字符串, 或 None
-        '''
-        r = requests.get('https://api.ipify.org')
-        syslog.syslog('API result: ' + r.text)
-        if r.ok:
-            return r.text
-
     def send_email(self, to_addr, subject='', content=None, filename=None):
         self.smtp_server.login()
         self.smtp_server.send_msg(to_addr, subject, content, filename)
@@ -176,15 +150,15 @@ class IpChangeNotifer(object):
     def run(self):
         while True:
             try:
-                new_ip = self.query_ip()
-                syslog.syslog('Queried IP: %s' % new_ip)
+                new_ip = self.ip_queryer.query_ip()
+                logging.debug(f'Queried IP: {new_ip}')
                 if new_ip and new_ip != self.old_ip:
                     old_ip = self.old_ip
                     self.send_email(Config.RECIEVER, 'Ubuntu IP address: %s' % new_ip, new_ip)
                     self.store_ip(new_ip)
-                    syslog.syslog('Notify IP changed. old: %s new: %s' % (old_ip, new_ip))
+                    logging.info('Notify IP changed. old: %s new: %s' % (old_ip, new_ip))
             except Exception as e:
-                syslog.syslog(str(e))
+                logging.error(str(e))
 
             try:
                 time.sleep(Config.CHECK_INTERVAL * 60)
@@ -193,5 +167,5 @@ class IpChangeNotifer(object):
                 break
 
 if __name__ == "__main__":
-    ip_chg_notifer = IpChangeNotifer()
-    ip_chg_notifer.run()
+    app = IpChangeNotifer()
+    app.run()
